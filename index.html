@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jungle Temple Escape</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050a05;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: #8fbc8f;
+        }
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: #000;
+            border: 8px solid #3e5d3e;
+            border-radius: 4px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
+        }
+        canvas { display: block; }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 20;
+        }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+            color: #aaffaa;
+            text-shadow: 2px 2px 4px #000;
+            z-index: 30;
+        }
+        #light-bar-container {
+            width: 200px;
+            height: 20px;
+            background: #222;
+            border: 2px solid #446644;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #light-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6600, #ffcc00);
+            transition: width 0.1s;
+        }
+        h1 {
+            font-size: 50px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00ff00;
+            color: #e8f5e9;
+        }
+        .intro-box {
+            text-align: center;
+            background: rgba(0, 20, 0, 0.95);
+            padding: 20px 40px;
+            border: 2px solid #446644;
+            border-radius: 10px;
+            color: #fff;
+            max-width: 500px;
+        }
+        .warning-text {
+            color: #ffaa00;
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: 15px;
+            border: 1px solid #ffaa00;
+            padding: 10px;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+        #start-btn, .menu-btn {
+            pointer-events: auto;
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 20px;
+            background-color: #2e8b57;
+            border: 2px solid #55a866;
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #1a5232;
+            transition: transform 0.1s;
+            text-transform: uppercase;
+            font-weight: bold;
+            font-family: inherit;
+        }
+        #start-btn:hover, .menu-btn:hover { background-color: #3cb371; }
+        #start-btn:active, .menu-btn:active { transform: translateY(5px); box-shadow: none; }
+        #level-text, #message-text {
+            font-size: 48px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 20px #000;
+        }
+        #message-text { font-size: 32px; color: #ffcc00; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="hud" class="hidden">
+            <div>Level: <span id="level-display">1</span> / 9</div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span>🔦 Light:</span>
+                <div id="light-bar-container"><div id="light-bar" style="width:100%"></div></div>
+            </div>
+            <div style="display:flex; align-items:center; gap:15px;">
+                <span>Torches: <span id="torch-count">0</span></span>
+                <span id="egg-status" style="opacity:0.3">🥚</span>
+            </div>
+        </div>
+        <div id="ui-layer">
+            <div id="start-screen" class="intro-box">
+                <h1>Temple Escape</h1>
+                <p>Guide the baby chick through the dark jungle temple!</p>
+                <p>Use <b>W A S D</b> or <b>Arrow Keys</b> to move.</p>
+                <p>Press <b>ESC</b> to pause.</p>
+                <div class="warning-text">
+                    Your torch light fades over time!<br>
+                    Collect torches to recharge it.<br>
+                    Find the hidden egg - press SPACE to throw!<br>
+                    Avoid Goblins and Spike Traps!<br>
+                    Reach the Exit to advance!
+                </div>
+                <div style="margin-top:15px;">
+                    <p><b>Select Difficulty:</b></p>
+                    <div style="display:flex; gap:10px; justify-content:center; margin-top:10px;">
+                        <button id="easy-btn" class="menu-btn" style="padding:10px 20px; background-color:#4CAF50;">Easy</button>
+                        <button id="medium-btn" class="menu-btn" style="padding:10px 20px; background-color:#FF9800;">Medium</button>
+                        <button id="hard-btn" class="menu-btn" style="padding:10px 20px; background-color:#f44336;">Hard</button>
+                    </div>
+                </div>
+                <button id="level-select-btn" class="menu-btn" style="margin-top:15px;">Level Select</button>
+            </div>
+            <div id="level-select-screen" class="intro-box hidden">
+                <h1>Level Select</h1>
+                <p>Choose a level</p>
+                <p id="level-select-difficulty" style="color:#ffaa00;"></p>
+                <div id="level-buttons" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:15px;">
+                </div>
+                <button class="menu-btn" id="back-btn" style="margin-top:20px;">Back</button>
+            </div>
+            <div id="pause-screen" class="intro-box hidden">
+                <h1>Paused</h1>
+                <p>Press ESC to resume</p>
+                <p id="pause-difficulty"></p>
+                <button class="menu-btn" id="resume-btn">Resume</button>
+                <button class="menu-btn" id="quit-btn" style="margin-left:10px;">Quit to Menu</button>
+            </div>
+            <div id="level-text" class="hidden">Level 1</div>
+            <div id="message-text" class="hidden"></div>
+            <div id="game-over-screen" class="intro-box hidden">
+                <h1>Darkness Consumed You!</h1>
+                <p>Your light ran out...</p>
+                <button class="menu-btn" id="retry-btn">Try Again</button>
+            </div>
+            <div id="win-screen" class="intro-box hidden">
+                <h1>Victory!</h1>
+                <p>You escaped the Temple!</p>
+                <p id="win-stats"></p>
+                <button class="menu-btn" id="play-again-btn">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const shadowCanvas = document.createElement('canvas');
+        shadowCanvas.width = canvas.width;
+        shadowCanvas.height = canvas.height;
+        const shadowCtx = shadowCanvas.getContext('2d');
+
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
+        const levelText = document.getElementById('level-text');
+        const messageText = document.getElementById('message-text');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const winScreen = document.getElementById('win-screen');
+        const hud = document.getElementById('hud');
+        const levelDisplay = document.getElementById('level-display');
+        const lightBar = document.getElementById('light-bar');
+        const torchCountEl = document.getElementById('torch-count');
+        const retryBtn = document.getElementById('retry-btn');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const eggStatus = document.getElementById('egg-status');
+        const levelSelectBtn = document.getElementById('level-select-btn');
+        const levelSelectScreen = document.getElementById('level-select-screen');
+        const levelSelectDifficulty = document.getElementById('level-select-difficulty');
+        const backBtn = document.getElementById('back-btn');
+        const pauseScreen = document.getElementById('pause-screen');
+        const pauseDifficulty = document.getElementById('pause-difficulty');
+        const resumeBtn = document.getElementById('resume-btn');
+        const quitBtn = document.getElementById('quit-btn');
+        const levelButtonsContainer = document.getElementById('level-buttons');
+        const easyBtn = document.getElementById('easy-btn');
+        const mediumBtn = document.getElementById('medium-btn');
+        const hardBtn = document.getElementById('hard-btn');
+
+        const PLAYER_SPEED = 210;
+        const PLAYER_SIZE = 24;
+        const CELL_SIZE = 40;
+        const MAZE_W = 20;
+        const MAZE_H = 15;
+        const MAX_LIGHT = 100;
+        const TOTAL_LEVELS = 9;
+        
+        // Difficulty settings
+        const DIFFICULTY = {
+            easy: {
+                name: 'Easy',
+                lightDecayRate: 2.5,
+                torchRestore: 40,
+                enemySpeedMultiplier: 1,
+                startLight: 100,
+                levelSelectLight: 100
+            },
+            medium: {
+                name: 'Medium',
+                lightDecayRate: 3.0,  // 5% faster (was 2.5, now ~20% faster for noticeable difference)
+                torchRestore: 35,     // 5% less (was 40)
+                enemySpeedMultiplier: 1,
+                startLight: 100,
+                levelSelectLight: 80
+            },
+            hard: {
+                name: 'Hard',
+                lightDecayRate: 3.125, // 25% faster decay
+                torchRestore: 30,      // 25% less restore
+                enemySpeedMultiplier: 2,
+                startLight: 75,        // Start with 25% less
+                levelSelectLight: 60
+            }
+        };
+        
+        let currentDifficulty = 'medium';
+        const GOBLIN_BASE_SPEED = 35;
+        const MIN_LIGHT_RADIUS = 45;
+        const MAX_LIGHT_RADIUS = 160;
+
+        let isPlaying = false;
+        let isPaused = false;
+        let startedFromLevelSelect = false;
+        let currentLevel = 1;
+        let lastTime = 0;
+        let globalTime = 0;
+        let lightLevel = MAX_LIGHT;
+        let torchesCollected = 0;
+        let totalTorchesCollected = 0;
+
+        let player = { x: 50, y: 50, width: PLAYER_SIZE, height: PLAYER_SIZE };
+        const keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
+
+        let walls = [];
+        let torches = [];
+        let enemies = [];
+        let traps = [];
+        let exitZone = { x: 750, y: 530, width: 40, height: 50 };
+        
+        // Egg mechanic
+        let egg = null; // { x, y, collected: false }
+        let hasEgg = false;
+        let thrownEgg = null; // { x, y, targetX, targetY, progress }
+
+        let wallPattern, floorPattern;
+
+        // Maze generation using recursive backtracking
+        function generateMaze(width, height, loopChance = 0.1) {
+            const maze = [];
+            for (let y = 0; y < height; y++) {
+                maze[y] = [];
+                for (let x = 0; x < width; x++) {
+                    maze[y][x] = 1; // 1 = wall
+                }
+            }
+            
+            const directions = [
+                [0, -2], [0, 2], [-2, 0], [2, 0]
+            ];
+            
+            function shuffle(arr) {
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                return arr;
+            }
+            
+            function carve(x, y) {
+                maze[y][x] = 0;
+                const dirs = shuffle([...directions]);
+                
+                for (const [dx, dy] of dirs) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    
+                    if (nx > 0 && nx < width - 1 && ny > 0 && ny < height - 1 && maze[ny][nx] === 1) {
+                        maze[y + dy/2][x + dx/2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+            
+            // Start from top-left area
+            carve(1, 1);
+            
+            // Add some loops to make multiple paths
+            for (let y = 2; y < height - 2; y++) {
+                for (let x = 2; x < width - 2; x++) {
+                    if (maze[y][x] === 1 && Math.random() < loopChance) {
+                        let pathNeighbors = 0;
+                        if (maze[y-1][x] === 0) pathNeighbors++;
+                        if (maze[y+1][x] === 0) pathNeighbors++;
+                        if (maze[y][x-1] === 0) pathNeighbors++;
+                        if (maze[y][x+1] === 0) pathNeighbors++;
+                        if (pathNeighbors >= 2) {
+                            maze[y][x] = 0;
+                        }
+                    }
+                }
+            }
+            
+            // Ensure start and exit are clear
+            maze[1][1] = 0;
+            maze[1][2] = 0;
+            maze[2][1] = 0;
+            maze[height-2][width-2] = 0;
+            maze[height-2][width-3] = 0;
+            maze[height-3][width-2] = 0;
+            
+            return maze;
+        }
+
+        function mazeToWalls(maze) {
+            const wallList = [];
+            const cellW = canvas.width / maze[0].length;
+            const cellH = canvas.height / maze.length;
+            
+            // Group adjacent walls horizontally
+            for (let y = 0; y < maze.length; y++) {
+                let startX = null;
+                for (let x = 0; x <= maze[0].length; x++) {
+                    if (x < maze[0].length && maze[y][x] === 1) {
+                        if (startX === null) startX = x;
+                    } else {
+                        if (startX !== null) {
+                            wallList.push({
+                                x: startX * cellW,
+                                y: y * cellH,
+                                width: (x - startX) * cellW,
+                                height: cellH
+                            });
+                            startX = null;
+                        }
+                    }
+                }
+            }
+            
+            return wallList;
+        }
+
+        function findPathCells(maze) {
+            const paths = [];
+            for (let y = 0; y < maze.length; y++) {
+                for (let x = 0; x < maze[0].length; x++) {
+                    if (maze[y][x] === 0) {
+                        paths.push({x, y});
+                    }
+                }
+            }
+            return paths;
+        }
+
+        function placeTorchesInMaze(maze, count) {
+            const paths = findPathCells(maze);
+            const cellW = canvas.width / maze[0].length;
+            const cellH = canvas.height / maze.length;
+            const torchList = [];
+            
+            // Shuffle and pick spread out locations
+            const shuffled = paths.sort(() => Math.random() - 0.5);
+            const minDist = 150;
+            
+            for (const cell of shuffled) {
+                if (torchList.length >= count) break;
+                
+                const tx = cell.x * cellW + cellW / 2;
+                const ty = cell.y * cellH + cellH / 2;
+                
+                // Skip if too close to start or exit
+                if (tx < 100 && ty < 100) continue;
+                if (tx > canvas.width - 100 && ty > canvas.height - 100) continue;
+                
+                // Check distance from other torches
+                let tooClose = false;
+                for (const t of torchList) {
+                    if (Math.hypot(tx - t.x, ty - t.y) < minDist) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                
+                if (!tooClose) {
+                    torchList.push({
+                        x: tx,
+                        y: ty,
+                        collected: false,
+                        phase: Math.random() * Math.PI * 2
+                    });
+                }
+            }
+            
+            return torchList;
+        }
+
+        function placeEnemiesInMaze(maze, count) {
+            const paths = findPathCells(maze);
+            const cellW = canvas.width / maze[0].length;
+            const cellH = canvas.height / maze.length;
+            const enemyList = [];
+            
+            const shuffled = paths.sort(() => Math.random() - 0.5);
+            
+            for (const cell of shuffled) {
+                if (enemyList.length >= count) break;
+                
+                const ex = cell.x * cellW + cellW / 2;
+                const ey = cell.y * cellH + cellH / 2;
+                
+                // Skip near start (top-left) - even larger exclusion zone
+                if (ex < 280 && ey < 280) continue;
+                // Skip near exit (bottom-right)
+                if (ex > canvas.width - 120 && ey > canvas.height - 120) continue;
+                
+                // Check if can patrol (has path neighbors)
+                let canH = maze[cell.y][cell.x-1] === 0 && maze[cell.y][cell.x+1] === 0;
+                let canV = maze[cell.y-1] && maze[cell.y-1][cell.x] === 0 && maze[cell.y+1] && maze[cell.y+1][cell.x] === 0;
+                
+                if (canH || canV) {
+                    enemyList.push({
+                        x: ex,
+                        y: ey,
+                        startX: ex,
+                        startY: ey,
+                        dir: canH ? 'h' : 'v',
+                        range: cellW * 2,
+                        speed: (GOBLIN_BASE_SPEED + currentLevel * 3) * DIFFICULTY[currentDifficulty].enemySpeedMultiplier,
+                        moving: 1,
+                        size: 22
+                    });
+                }
+            }
+            
+            return enemyList;
+        }
+
+        function placeTrapsInMaze(maze, count) {
+            const cellW = canvas.width / maze[0].length;
+            const cellH = canvas.height / maze.length;
+            const trapList = [];
+            
+            // Find all 2x2 open areas where trap can be placed and walked around
+            const validSpots = [];
+            for (let y = 1; y < maze.length - 2; y++) {
+                for (let x = 1; x < maze[0].length - 2; x++) {
+                    // Check if this is a 2x2 open area
+                    if (maze[y][x] === 0 && 
+                        maze[y][x+1] === 0 && 
+                        maze[y+1][x] === 0 && 
+                        maze[y+1][x+1] === 0) {
+                        
+                        const tx = x * cellW + cellW; // Center of 2x2
+                        const ty = y * cellH + cellH;
+                        
+                        // Skip near start (top-left)
+                        if (tx < 160 && ty < 160) continue;
+                        // Skip near exit (bottom-right)
+                        if (tx > canvas.width - 160 && ty > canvas.height - 160) continue;
+                        
+                        validSpots.push({ x: tx, y: ty, cellX: x, cellY: y });
+                    }
+                }
+            }
+            
+            // Shuffle and pick traps
+            const shuffled = validSpots.sort(() => Math.random() - 0.5);
+            const minDist = 120;
+            
+            for (const spot of shuffled) {
+                if (trapList.length >= count) break;
+                
+                // Check distance from other traps
+                let tooClose = false;
+                for (const t of trapList) {
+                    if (Math.hypot(spot.x - t.x, spot.y - t.y) < minDist) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                
+                if (!tooClose) {
+                    // Smaller trap in center of 2x2 area
+                    const trapSize = cellW * 0.5;
+                    trapList.push({
+                        x: spot.x - trapSize / 2,
+                        y: spot.y - trapSize / 2,
+                        width: trapSize,
+                        height: trapSize,
+                        active: true,
+                        timer: Math.random() * 2
+                    });
+                }
+            }
+            
+            return trapList;
+        }
+
+        function placeEggInMaze(maze) {
+            const paths = findPathCells(maze);
+            const cellW = canvas.width / maze[0].length;
+            const cellH = canvas.height / maze.length;
+            
+            // Shuffle paths and find a good hidden spot
+            const shuffled = paths.sort(() => Math.random() - 0.5);
+            
+            for (const cell of shuffled) {
+                const ex = cell.x * cellW + cellW / 2;
+                const ey = cell.y * cellH + cellH / 2;
+                
+                // Skip near start
+                if (ex < 200 && ey < 200) continue;
+                // Skip near exit
+                if (ex > canvas.width - 200 && ey > canvas.height - 200) continue;
+                
+                // Prefer spots that are somewhat hidden (dead ends or corners)
+                let wallNeighbors = 0;
+                if (maze[cell.y-1] && maze[cell.y-1][cell.x] === 1) wallNeighbors++;
+                if (maze[cell.y+1] && maze[cell.y+1][cell.x] === 1) wallNeighbors++;
+                if (maze[cell.y][cell.x-1] === 1) wallNeighbors++;
+                if (maze[cell.y][cell.x+1] === 1) wallNeighbors++;
+                
+                // Prefer spots with 2-3 wall neighbors (corners/alcoves)
+                if (wallNeighbors >= 2) {
+                    return { x: ex, y: ey, collected: false };
+                }
+            }
+            
+            // Fallback: just pick a random spot
+            const fallback = shuffled[Math.floor(shuffled.length / 2)];
+            return {
+                x: fallback.x * cellW + cellW / 2,
+                y: fallback.y * cellH + cellH / 2,
+                collected: false
+            };
+        }
+
+        // Level configurations: loopChance makes more alternate paths, higher = more complex
+        const levelConfigs = [
+            { torches: 3, enemies: 0, traps: 0, loopChance: 0.02 },  // L1: Simple intro
+            { torches: 3, enemies: 1, traps: 1, loopChance: 0.03 },  // L2
+            { torches: 3, enemies: 2, traps: 0, loopChance: 0.05 },  // L3: No traps
+            { torches: 2, enemies: 2, traps: 3, loopChance: 0.06 },  // L4
+            { torches: 2, enemies: 3, traps: 3, loopChance: 0.07 },  // L5
+            { torches: 2, enemies: 3, traps: 4, loopChance: 0.08 },  // L6
+            { torches: 2, enemies: 4, traps: 4, loopChance: 0.08 },  // L7
+            { torches: 2, enemies: 4, traps: 5, loopChance: 0.09 },  // L8
+            { torches: 2, enemies: 5, traps: 6, loopChance: 0.10 },  // L9: Hardest
+        ];
+
+        function loadLevel(lvl) {
+            currentLevel = lvl;
+            const config = levelConfigs[lvl - 1];
+            
+            // Generate procedural maze
+            const maze = generateMaze(MAZE_W, MAZE_H, config.loopChance);
+            
+            walls = mazeToWalls(maze);
+            torches = placeTorchesInMaze(maze, config.torches);
+            enemies = placeEnemiesInMaze(maze, config.enemies);
+            traps = placeTrapsInMaze(maze, config.traps);
+            
+            // Place hidden egg
+            egg = placeEggInMaze(maze);
+            hasEgg = false;
+            thrownEgg = null;
+            
+            // Level 5: Place egg right near spawn
+            if (lvl === 5) {
+                const cellW = canvas.width / MAZE_W;
+                const cellH = canvas.height / MAZE_H;
+                egg = { x: cellW * 2.5, y: cellH * 1.5, collected: false };
+            }
+            
+            // Player start
+            const cellW = canvas.width / MAZE_W;
+            const cellH = canvas.height / MAZE_H;
+            player.x = cellW * 1.5 - player.width / 2;
+            player.y = cellH * 1.5 - player.height / 2;
+            
+            // Exit position
+            exitZone.x = canvas.width - cellW * 1.5 - 20;
+            exitZone.y = canvas.height - cellH * 1.5 - 25;
+            exitZone.width = 40;
+            exitZone.height = 50;
+            
+            if (lvl === 1) {
+                lightLevel = MAX_LIGHT;
+            }
+            
+            torchesCollected = 0;
+            updateHUD();
+            levelDisplay.textContent = lvl;
+            showMessage("Level " + lvl, 2000);
+        }
+
+        function showMessage(text, duration) {
+            messageText.textContent = text;
+            messageText.classList.remove('hidden');
+            setTimeout(() => messageText.classList.add('hidden'), duration);
+        }
+
+        function updateHUD() {
+            lightBar.style.width = lightLevel + '%';
+            if (lightLevel < 30) {
+                lightBar.style.background = 'linear-gradient(90deg, #ff0000, #ff4400)';
+            } else if (lightLevel < 60) {
+                lightBar.style.background = 'linear-gradient(90deg, #ff6600, #ffaa00)';
+            } else {
+                lightBar.style.background = 'linear-gradient(90deg, #ff6600, #ffcc00)';
+            }
+            torchCountEl.textContent = totalTorchesCollected;
+            
+            // Update egg status
+            if (hasEgg) {
+                eggStatus.style.opacity = '1';
+                eggStatus.textContent = '🥚 Press SPACE';
+            } else if (egg && egg.collected) {
+                eggStatus.style.opacity = '0.3';
+                eggStatus.textContent = '🥚';
+            } else {
+                eggStatus.style.opacity = '0.3';
+                eggStatus.textContent = '🥚';
+            }
+        }
+
+        function createPatterns() {
+            const wCan = document.createElement('canvas');
+            wCan.width = 64; wCan.height = 64;
+            const wCtx = wCan.getContext('2d');
+            wCtx.fillStyle = '#2a352a';
+            wCtx.fillRect(0, 0, 64, 64);
+            wCtx.strokeStyle = '#1a221a';
+            wCtx.lineWidth = 2;
+            for (let y = 0; y < 4; y++) {
+                for (let x = 0; x < 4; x++) {
+                    wCtx.strokeRect(x * 16 + (y % 2) * 8, y * 16, 16, 16);
+                }
+            }
+            for (let i = 0; i < 60; i++) {
+                wCtx.fillStyle = Math.random() > 0.5 ? '#3e5d3e' : '#2e4d2e';
+                wCtx.fillRect(Math.random() * 64, Math.random() * 64, 2, 2);
+            }
+            wallPattern = ctx.createPattern(wCan, 'repeat');
+
+            const fCan = document.createElement('canvas');
+            fCan.width = 64; fCan.height = 64;
+            const fCtx = fCan.getContext('2d');
+            fCtx.fillStyle = '#080c08';
+            fCtx.fillRect(0, 0, 64, 64);
+            for (let i = 0; i < 40; i++) {
+                fCtx.strokeStyle = `rgba(30, 50, 30, ${Math.random() * 0.4})`;
+                fCtx.lineWidth = 1;
+                fCtx.beginPath();
+                fCtx.moveTo(Math.random() * 64, Math.random() * 64);
+                fCtx.lineTo(Math.random() * 64, Math.random() * 64);
+                fCtx.stroke();
+            }
+            floorPattern = ctx.createPattern(fCan, 'repeat');
+        }
+
+        function startGame(difficulty) {
+            currentDifficulty = difficulty || 'medium';
+            
+            startScreen.classList.add('hidden');
+            levelSelectScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            winScreen.classList.add('hidden');
+            pauseScreen.classList.add('hidden');
+            hud.classList.remove('hidden');
+            
+            isPlaying = true;
+            isPaused = false;
+            startedFromLevelSelect = false;
+            lightLevel = DIFFICULTY[currentDifficulty].startLight;
+            totalTorchesCollected = 0;
+            currentLevel = 1;
+            
+            loadLevel(1);
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startFromLevel(lvl) {
+            startScreen.classList.add('hidden');
+            levelSelectScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            winScreen.classList.add('hidden');
+            pauseScreen.classList.add('hidden');
+            hud.classList.remove('hidden');
+            
+            isPlaying = true;
+            isPaused = false;
+            startedFromLevelSelect = true;
+            lightLevel = DIFFICULTY[currentDifficulty].levelSelectLight;
+            totalTorchesCollected = 0;
+            currentLevel = lvl;
+            
+            loadLevel(lvl);
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function togglePause() {
+            if (!isPlaying) return;
+            
+            isPaused = !isPaused;
+            if (isPaused) {
+                pauseDifficulty.textContent = 'Difficulty: ' + DIFFICULTY[currentDifficulty].name;
+                pauseScreen.classList.remove('hidden');
+            } else {
+                pauseScreen.classList.add('hidden');
+                lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function quitToMenu() {
+            isPlaying = false;
+            isPaused = false;
+            pauseScreen.classList.add('hidden');
+            hud.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+        }
+
+        function showLevelSelect() {
+            startScreen.classList.add('hidden');
+            levelSelectScreen.classList.remove('hidden');
+            
+            // Show current difficulty
+            const diffSettings = DIFFICULTY[currentDifficulty];
+            levelSelectDifficulty.textContent = `${diffSettings.name} Mode - Starts with ${diffSettings.levelSelectLight}% light`;
+            
+            // Generate level buttons
+            levelButtonsContainer.innerHTML = '';
+            for (let i = 1; i <= TOTAL_LEVELS; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'menu-btn';
+                btn.style.padding = '10px 20px';
+                btn.style.fontSize = '16px';
+                btn.textContent = i;
+                btn.addEventListener('click', () => {
+                    createPatterns();
+                    startFromLevel(i);
+                });
+                levelButtonsContainer.appendChild(btn);
+            }
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            hud.classList.add('hidden');
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        function winGame() {
+            isPlaying = false;
+            hud.classList.add('hidden');
+            document.getElementById('win-stats').textContent = 
+                `Difficulty: ${DIFFICULTY[currentDifficulty].name}\nTorches collected: ${totalTorchesCollected}`;
+            winScreen.classList.remove('hidden');
+        }
+
+        function gameLoop(timestamp) {
+            if (!isPlaying || isPaused) return;
+            
+            const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+            lastTime = timestamp;
+            globalTime += dt;
+            
+            update(dt);
+            draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            let dx = 0, dy = 0;
+            if (keys.w || keys.arrowup) dy -= 1;
+            if (keys.s || keys.arrowdown) dy += 1;
+            if (keys.a || keys.arrowleft) dx -= 1;
+            if (keys.d || keys.arrowright) dx += 1;
+            
+            if (dx !== 0 && dy !== 0) {
+                dx *= 0.707;
+                dy *= 0.707;
+            }
+            
+            const newX = player.x + dx * PLAYER_SPEED * dt;
+            const newY = player.y + dy * PLAYER_SPEED * dt;
+            
+            if (!checkWallCollision(newX, player.y)) player.x = newX;
+            if (!checkWallCollision(player.x, newY)) player.y = newY;
+            
+            player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+            
+            lightLevel -= DIFFICULTY[currentDifficulty].lightDecayRate * dt;
+            if (lightLevel <= 0) {
+                lightLevel = 0;
+                gameOver();
+                return;
+            }
+            
+            for (let e of enemies) {
+                if (e.dir === 'h') {
+                    e.x += e.speed * e.moving * dt;
+                    if (e.x > e.startX + e.range || e.x < e.startX - e.range) {
+                        e.moving *= -1;
+                    }
+                } else {
+                    e.y += e.speed * e.moving * dt;
+                    if (e.y > e.startY + e.range || e.y < e.startY - e.range) {
+                        e.moving *= -1;
+                    }
+                }
+            }
+            
+            for (let t of traps) {
+                t.timer += dt;
+                t.active = Math.sin(t.timer * 2.5) > 0;
+            }
+            
+            const pCX = player.x + player.width / 2;
+            const pCY = player.y + player.height / 2;
+            
+            for (let t of torches) {
+                if (!t.collected) {
+                    const dist = Math.hypot(pCX - t.x, pCY - t.y);
+                    if (dist < 25) {
+                        t.collected = true;
+                        lightLevel = Math.min(MAX_LIGHT, lightLevel + DIFFICULTY[currentDifficulty].torchRestore);
+                        torchesCollected++;
+                        totalTorchesCollected++;
+                        showMessage("+Light!", 500);
+                    }
+                }
+            }
+            
+            // Check egg collection
+            if (egg && !egg.collected && !hasEgg) {
+                const dist = Math.hypot(pCX - egg.x, pCY - egg.y);
+                if (dist < 25) {
+                    egg.collected = true;
+                    hasEgg = true;
+                    showMessage("Egg collected! SPACE to throw!", 1500);
+                }
+            }
+            
+            // Update thrown egg animation
+            if (thrownEgg) {
+                thrownEgg.progress += dt * 4; // Speed of throw
+                if (thrownEgg.progress >= 1) {
+                    // Egg hit target - find and eliminate closest enemy
+                    let closestEnemy = null;
+                    let closestDist = Infinity;
+                    for (let i = 0; i < enemies.length; i++) {
+                        const e = enemies[i];
+                        const dist = Math.hypot(thrownEgg.targetX - e.x, thrownEgg.targetY - e.y);
+                        if (dist < 30) {
+                            closestEnemy = i;
+                            break;
+                        }
+                    }
+                    
+                    if (closestEnemy !== null) {
+                        const e = enemies[closestEnemy];
+                        // Turn enemy into a torch
+                        torches.push({
+                            x: e.x,
+                            y: e.y,
+                            collected: false,
+                            phase: Math.random() * Math.PI * 2
+                        });
+                        enemies.splice(closestEnemy, 1);
+                        showMessage("Goblin defeated!", 1000);
+                    }
+                    thrownEgg = null;
+                }
+            }
+            
+            for (let e of enemies) {
+                if (rectCollision(player, { x: e.x - e.size/2, y: e.y - e.size/2, width: e.size, height: e.size })) {
+                    resetLevel();
+                    return;
+                }
+            }
+            
+            for (let t of traps) {
+                if (t.active && rectCollision(player, t)) {
+                    resetLevel();
+                    return;
+                }
+            }
+            
+            if (rectCollision(player, exitZone)) {
+                if (currentLevel >= TOTAL_LEVELS) {
+                    winGame();
+                } else {
+                    // Reward: +25% light, or full 100% if at 86% or higher
+                    if (lightLevel >= 86) {
+                        lightLevel = MAX_LIGHT;
+                    } else {
+                        lightLevel = Math.min(MAX_LIGHT, lightLevel + 25);
+                    }
+                    showMessage("+25% Light!", 1000);
+                    loadLevel(currentLevel + 1);
+                }
+            }
+            
+            updateHUD();
+        }
+
+        function checkWallCollision(x, y) {
+            const testRect = { x: x + 3, y: y + 3, width: player.width - 6, height: player.height - 6 };
+            for (let w of walls) {
+                if (rectCollision(testRect, w)) return true;
+            }
+            return false;
+        }
+
+        function rectCollision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        function resetLevel() {
+            const cellW = canvas.width / MAZE_W;
+            const cellH = canvas.height / MAZE_H;
+            player.x = cellW * 1.5 - player.width / 2;
+            player.y = cellH * 1.5 - player.height / 2;
+            lightLevel = Math.max(25, lightLevel - 12);
+            showMessage("Ouch!", 800);
+        }
+
+        function drawChicken(x, y, w, h) {
+            const cx = x + w / 2;
+            const cy = y + h / 2;
+            const bob = Math.sin(globalTime * 8) * 1.5;
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(cx, cy + h/2 + 2, w/3, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#ff9800';
+            ctx.fillRect(cx - 5, cy + 8, 3, 5);
+            ctx.fillRect(cx + 2, cy + 8, 3, 5);
+            
+            ctx.fillStyle = '#ffeb3b';
+            ctx.beginPath();
+            ctx.arc(cx, cy + bob, w / 2 - 1, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#fdd835';
+            ctx.beginPath();
+            ctx.ellipse(cx - 5, cy + bob + 2, 4, 2.5, Math.PI / 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx + 5, cy + bob + 2, 4, 2.5, -Math.PI / 6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(cx - 4, cy + bob - 2, 2.5, 0, Math.PI * 2);
+            ctx.arc(cx + 4, cy + bob - 2, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(cx - 3, cy + bob - 3, 1, 0, Math.PI * 2);
+            ctx.arc(cx + 5, cy + bob - 3, 1, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#ff9800';
+            ctx.beginPath();
+            ctx.moveTo(cx - 2, cy + bob + 1);
+            ctx.lineTo(cx + 2, cy + bob + 1);
+            ctx.lineTo(cx, cy + bob + 4);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.strokeStyle = '#ffeb3b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy + bob - w/2);
+            ctx.quadraticCurveTo(cx - 3, cy + bob - w/2 - 6, cx - 5, cy + bob - w/2 - 3);
+            ctx.stroke();
+            
+            const glowSize = 12 + Math.sin(globalTime * 6) * 2;
+            const glow = ctx.createRadialGradient(cx + 8, cy + bob - 8, 1, cx + 8, cy + bob - 8, glowSize);
+            glow.addColorStop(0, 'rgba(255, 150, 50, 0.5)');
+            glow.addColorStop(1, 'rgba(255, 100, 0, 0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(cx + 8, cy + bob - 8, glowSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(cx + 6, cy + bob - 6, 3, 10);
+            ctx.fillStyle = '#ff6600';
+            ctx.beginPath();
+            ctx.arc(cx + 7.5, cy + bob - 8, 3 + Math.sin(globalTime * 10), 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawBabyMonkey(x, y) {
+            const scale = 0.75; // Make monkey shorter
+            const bob = Math.sin(globalTime * 3) * 2 * scale;
+            const wave = Math.sin(globalTime * 4) * 0.15;
+            
+            // Offset y to account for smaller size
+            y = y + 8;
+            
+            // Torch glow behind monkey
+            const glowSize = (30 + Math.sin(globalTime * 6) * 5) * scale;
+            const glow = ctx.createRadialGradient(x + 10 * scale, y - 15 * scale + bob, 2, x + 10 * scale, y - 15 * scale + bob, glowSize);
+            glow.addColorStop(0, 'rgba(255, 180, 80, 0.6)');
+            glow.addColorStop(0.5, 'rgba(255, 120, 50, 0.3)');
+            glow.addColorStop(1, 'rgba(255, 80, 0, 0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(x + 10 * scale, y - 15 * scale + bob, glowSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(x, y + 14 * scale, 10 * scale, 3 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Tail (curly)
+            ctx.strokeStyle = '#8B6914';
+            ctx.lineWidth = 2.5 * scale;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x - 6 * scale, y + 6 * scale + bob);
+            ctx.quadraticCurveTo(x - 14 * scale, y + 4 * scale + bob, x - 16 * scale, y - 4 * scale + bob);
+            ctx.quadraticCurveTo(x - 14 * scale, y - 12 * scale + bob, x - 9 * scale, y - 9 * scale + bob);
+            ctx.stroke();
+            
+            // Feet
+            ctx.fillStyle = '#D4A574';
+            ctx.beginPath();
+            ctx.ellipse(x - 5 * scale, y + 12 * scale + bob, 4 * scale, 2.5 * scale, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(x + 5 * scale, y + 12 * scale + bob, 4 * scale, 2.5 * scale, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Body
+            ctx.fillStyle = '#A67B4A';
+            ctx.beginPath();
+            ctx.ellipse(x, y + 4 * scale + bob, 10 * scale, 11 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Blue vest
+            ctx.fillStyle = '#4A90D9';
+            ctx.beginPath();
+            ctx.moveTo(x - 8 * scale, y - 4 * scale + bob);
+            ctx.lineTo(x - 6 * scale, y + 9 * scale + bob);
+            ctx.lineTo(x + 6 * scale, y + 9 * scale + bob);
+            ctx.lineTo(x + 8 * scale, y - 4 * scale + bob);
+            ctx.lineTo(x + 3 * scale, y - 6 * scale + bob);
+            ctx.lineTo(x, y - 4 * scale + bob);
+            ctx.lineTo(x - 3 * scale, y - 6 * scale + bob);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Vest outline
+            ctx.strokeStyle = '#3A70B9';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Vest buttons
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(x, y * scale / 2 + bob, 1.5 * scale, 0, Math.PI * 2);
+            ctx.arc(x, y * scale / 2 + 5 * scale + bob, 1.5 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Arm holding torch (right arm)
+            ctx.fillStyle = '#A67B4A';
+            ctx.beginPath();
+            ctx.ellipse(x + 11 * scale, y - 4 * scale + bob, 3 * scale, 5 * scale, wave + 0.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Hand
+            ctx.fillStyle = '#D4A574';
+            ctx.beginPath();
+            ctx.arc(x + 12 * scale, y - 8 * scale + bob, 3 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Torch stick
+            ctx.fillStyle = '#6B4423';
+            ctx.save();
+            ctx.translate(x + 12 * scale, y - 8 * scale + bob);
+            ctx.rotate(-0.3);
+            ctx.fillRect(-1.5 * scale, -14 * scale, 3 * scale, 12 * scale);
+            ctx.restore();
+            
+            // Torch flame
+            const flicker = Math.sin(globalTime * 10) * 2;
+            ctx.fillStyle = '#FF6600';
+            ctx.beginPath();
+            ctx.arc(x + 9 * scale, y - 19 * scale + bob, (5 + flicker) * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#FFAA00';
+            ctx.beginPath();
+            ctx.arc(x + 9 * scale, y - 19 * scale + bob, (4 + flicker * 0.5) * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#FFDD66';
+            ctx.beginPath();
+            ctx.arc(x + 9 * scale, y - 19 * scale + bob, 2.5 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Left arm (waving)
+            ctx.fillStyle = '#A67B4A';
+            ctx.beginPath();
+            ctx.ellipse(x - 11 * scale, y - 2 * scale + bob + Math.sin(globalTime * 5) * 2 * scale, 3 * scale, 5 * scale, -wave - 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Left hand
+            ctx.fillStyle = '#D4A574';
+            ctx.beginPath();
+            ctx.arc(x - 12 * scale, y - 5 * scale + bob + Math.sin(globalTime * 5) * 3 * scale, 3 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Head
+            ctx.fillStyle = '#A67B4A';
+            ctx.beginPath();
+            ctx.arc(x, y - 11 * scale + bob, 9 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Face (lighter area)
+            ctx.fillStyle = '#D4A574';
+            ctx.beginPath();
+            ctx.ellipse(x, y - 9 * scale + bob, 6 * scale, 7 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Ears
+            ctx.fillStyle = '#A67B4A';
+            ctx.beginPath();
+            ctx.arc(x - 9 * scale, y - 11 * scale + bob, 4 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + 9 * scale, y - 11 * scale + bob, 4 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Inner ears
+            ctx.fillStyle = '#D4A574';
+            ctx.beginPath();
+            ctx.arc(x - 9 * scale, y - 11 * scale + bob, 2.5 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + 9 * scale, y - 11 * scale + bob, 2.5 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Eyes (big and cute)
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.ellipse(x - 3 * scale, y - 11 * scale + bob, 2.5 * scale, 3 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(x + 3 * scale, y - 11 * scale + bob, 2.5 * scale, 3 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Eye shine
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(x - 2 * scale, y - 12 * scale + bob, 1 * scale, 0, Math.PI * 2);
+            ctx.arc(x + 4 * scale, y - 12 * scale + bob, 1 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Cute smile
+            ctx.strokeStyle = '#6B4423';
+            ctx.lineWidth = 1.5 * scale;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.arc(x, y - 6 * scale + bob, 3 * scale, 0.2, Math.PI - 0.2);
+            ctx.stroke();
+            
+            // Rosy cheeks
+            ctx.fillStyle = 'rgba(255, 150, 150, 0.4)';
+            ctx.beginPath();
+            ctx.ellipse(x - 5 * scale, y - 8 * scale + bob, 2 * scale, 1.5 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(x + 5 * scale, y - 8 * scale + bob, 2 * scale, 1.5 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Tuft of hair
+            ctx.strokeStyle = '#8B6914';
+            ctx.lineWidth = 1.5 * scale;
+            ctx.beginPath();
+            ctx.moveTo(x - 1.5 * scale, y - 19 * scale + bob);
+            ctx.quadraticCurveTo(x, y - 24 * scale + bob, x + 2 * scale, y - 21 * scale + bob);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x + 0.5 * scale, y - 19 * scale + bob);
+            ctx.quadraticCurveTo(x + 3 * scale, y - 23 * scale + bob, x + 4.5 * scale, y - 20 * scale + bob);
+            ctx.stroke();
+        }
+
+        function drawEnemy(e) {
+            const wobble = Math.sin(globalTime * 4 + e.x) * 1.5;
+            
+            ctx.fillStyle = '#2d5a27';
+            ctx.beginPath();
+            ctx.arc(e.x, e.y + wobble, e.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.arc(e.x - 4, e.y + wobble - 2, 3, 0, Math.PI * 2);
+            ctx.arc(e.x + 4, e.y + wobble - 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(e.x - 4, e.y + wobble - 2, 1.5, 0, Math.PI * 2);
+            ctx.arc(e.x + 4, e.y + wobble - 2, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(e.x, e.y + wobble + 4, 4, 0, Math.PI);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#2d5a27';
+            ctx.beginPath();
+            ctx.moveTo(e.x - 6, e.y + wobble - 8);
+            ctx.lineTo(e.x - 9, e.y + wobble - 14);
+            ctx.lineTo(e.x - 3, e.y + wobble - 9);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(e.x + 6, e.y + wobble - 8);
+            ctx.lineTo(e.x + 9, e.y + wobble - 14);
+            ctx.lineTo(e.x + 3, e.y + wobble - 9);
+            ctx.fill();
+        }
+
+        function drawTrap(t) {
+            // Calculate distance from player to trap center
+            const pCX = player.x + player.width / 2;
+            const pCY = player.y + player.height / 2;
+            const trapCX = t.x + t.width / 2;
+            const trapCY = t.y + t.height / 2;
+            const dist = Math.hypot(pCX - trapCX, pCY - trapCY);
+            
+            // Fade in as player gets closer (fully visible within 80px, invisible beyond 200px)
+            const maxDist = 200;
+            const minDist = 80;
+            let alpha = 1;
+            if (dist > minDist) {
+                alpha = 1 - Math.min(1, (dist - minDist) / (maxDist - minDist));
+            }
+            
+            if (alpha <= 0.05) return; // Don't draw if too far
+            
+            if (!t.active) {
+                ctx.fillStyle = `rgba(34, 34, 34, ${alpha})`;
+                ctx.fillRect(t.x, t.y, t.width, t.height);
+                ctx.fillStyle = `rgba(51, 51, 51, ${alpha})`;
+                ctx.fillRect(t.x + 2, t.y + 2, t.width - 4, t.height - 4);
+                return;
+            }
+            
+            ctx.fillStyle = `rgba(51, 51, 51, ${alpha})`;
+            ctx.fillRect(t.x, t.y, t.width, t.height);
+            
+            // Spikes
+            const spikeCount = 3;
+            const spikeWidth = t.width / spikeCount;
+            ctx.fillStyle = `rgba(119, 119, 119, ${alpha})`;
+            for (let i = 0; i < spikeCount; i++) {
+                ctx.beginPath();
+                ctx.moveTo(t.x + i * spikeWidth, t.y + t.height);
+                ctx.lineTo(t.x + i * spikeWidth + spikeWidth / 2, t.y + 2);
+                ctx.lineTo(t.x + (i + 1) * spikeWidth, t.y + t.height);
+                ctx.fill();
+            }
+            
+            // Subtle danger glow when active (no red flash, just slight highlight)
+            ctx.fillStyle = `rgba(255, 100, 100, ${0.15 * alpha})`;
+            ctx.fillRect(t.x - 1, t.y - 1, t.width + 2, t.height + 2);
+        }
+
+        function drawTorch(t) {
+            if (t.collected) return;
+            
+            const flicker = Math.sin(globalTime * 8 + t.phase) * 1.5;
+            
+            ctx.fillStyle = '#6B4423';
+            ctx.fillRect(t.x - 2, t.y + 2, 4, 12);
+            
+            const flameSize = 6 + flicker;
+            ctx.fillStyle = '#ff5500';
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, flameSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#ffaa00';
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, flameSize * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#ffee88';
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, flameSize * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawEgg(e) {
+            if (e.collected) return;
+            
+            const bob = Math.sin(globalTime * 3) * 2;
+            const glow = Math.sin(globalTime * 4) * 0.2 + 0.8;
+            
+            // Glow effect
+            ctx.fillStyle = `rgba(255, 250, 220, ${0.3 * glow})`;
+            ctx.beginPath();
+            ctx.arc(e.x, e.y + bob, 18, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Egg shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(e.x, e.y + 12, 8, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Egg body (oval)
+            ctx.fillStyle = '#FFF8E7';
+            ctx.beginPath();
+            ctx.ellipse(e.x, e.y + bob, 8, 11, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Egg highlight
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.ellipse(e.x - 2, e.y + bob - 4, 3, 4, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Cute spots
+            ctx.fillStyle = '#FFD699';
+            ctx.beginPath();
+            ctx.arc(e.x + 3, e.y + bob + 2, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(e.x - 2, e.y + bob + 5, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawThrownEgg() {
+            if (!thrownEgg) return;
+            
+            // Interpolate position
+            const x = thrownEgg.x + (thrownEgg.targetX - thrownEgg.x) * thrownEgg.progress;
+            const y = thrownEgg.y + (thrownEgg.targetY - thrownEgg.y) * thrownEgg.progress;
+            
+            // Arc trajectory (parabola)
+            const arcHeight = -80 * Math.sin(thrownEgg.progress * Math.PI);
+            
+            // Rotation
+            const rotation = thrownEgg.progress * Math.PI * 4;
+            
+            ctx.save();
+            ctx.translate(x, y + arcHeight);
+            ctx.rotate(rotation);
+            
+            // Egg
+            ctx.fillStyle = '#FFF8E7';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 6, 9, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Motion blur trail
+            ctx.restore();
+            
+            ctx.strokeStyle = 'rgba(255, 250, 220, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(thrownEgg.x, thrownEgg.y);
+            ctx.quadraticCurveTo(x, y + arcHeight - 20, x, y + arcHeight);
+            ctx.stroke();
+        }
+
+        function draw() {
+            ctx.fillStyle = floorPattern || '#080c08';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = wallPattern || '#2a352a';
+            for (let w of walls) {
+                ctx.fillRect(w.x, w.y, w.width, w.height);
+            }
+            
+            // Exit zone glow (no text, monkey is there)
+            
+            ctx.fillStyle = 'rgba(100, 150, 255, 0.15)';
+            const cellW = canvas.width / MAZE_W;
+            const cellH = canvas.height / MAZE_H;
+            ctx.fillRect(cellW, cellH, cellW, cellH);
+            
+            // Draw cute baby monkey at exit
+            drawBabyMonkey(exitZone.x + exitZone.width / 2, exitZone.y + exitZone.height / 2);
+            
+            for (let t of torches) drawTorch(t);
+            for (let t of traps) drawTrap(t);
+            for (let e of enemies) drawEnemy(e);
+            
+            // Draw hidden egg
+            if (egg && !egg.collected) drawEgg(egg);
+            
+            // Draw thrown egg
+            drawThrownEgg();
+            
+            drawChicken(player.x, player.y, player.width, player.height);
+            
+            // Shadow layer
+            shadowCtx.clearRect(0, 0, canvas.width, canvas.height);
+            shadowCtx.fillStyle = 'rgba(0, 0, 0, 0.98)';
+            shadowCtx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            shadowCtx.globalCompositeOperation = 'destination-out';
+            
+            const pCX = player.x + player.width / 2;
+            const pCY = player.y + player.height / 2;
+            const lightRadius = MIN_LIGHT_RADIUS + (MAX_LIGHT_RADIUS - MIN_LIGHT_RADIUS) * (lightLevel / MAX_LIGHT);
+            
+            const pGrad = shadowCtx.createRadialGradient(pCX, pCY, 15, pCX, pCY, lightRadius);
+            pGrad.addColorStop(0, 'rgba(0,0,0,1)');
+            pGrad.addColorStop(0.6, 'rgba(0,0,0,0.9)');
+            pGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            
+            shadowCtx.fillStyle = pGrad;
+            shadowCtx.beginPath();
+            shadowCtx.arc(pCX, pCY, lightRadius, 0, Math.PI * 2);
+            shadowCtx.fill();
+            
+            for (let t of torches) {
+                if (t.collected) continue;
+                
+                const flicker = Math.sin(globalTime * 6 + t.phase) * 4;
+                const radius = 40 + flicker;
+                
+                const tGrad = shadowCtx.createRadialGradient(t.x, t.y, 3, t.x, t.y, radius);
+                tGrad.addColorStop(0, 'rgba(0,0,0,1)');
+                tGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                
+                shadowCtx.fillStyle = tGrad;
+                shadowCtx.beginPath();
+                shadowCtx.arc(t.x, t.y, radius, 0, Math.PI * 2);
+                shadowCtx.fill();
+            }
+            
+            // Egg glow (subtle so it's hidden but findable)
+            if (egg && !egg.collected) {
+                const eggGlow = shadowCtx.createRadialGradient(egg.x, egg.y, 3, egg.x, egg.y, 35);
+                eggGlow.addColorStop(0, 'rgba(0,0,0,1)');
+                eggGlow.addColorStop(1, 'rgba(0,0,0,0)');
+                shadowCtx.fillStyle = eggGlow;
+                shadowCtx.beginPath();
+                shadowCtx.arc(egg.x, egg.y, 35, 0, Math.PI * 2);
+                shadowCtx.fill();
+            }
+            
+            const exitGlow = shadowCtx.createRadialGradient(
+                exitZone.x + exitZone.width / 2, exitZone.y + exitZone.height / 2, 8,
+                exitZone.x + exitZone.width / 2, exitZone.y + exitZone.height / 2, 80
+            );
+            exitGlow.addColorStop(0, 'rgba(0,0,0,1)');
+            exitGlow.addColorStop(1, 'rgba(0,0,0,0)');
+            shadowCtx.fillStyle = exitGlow;
+            shadowCtx.beginPath();
+            shadowCtx.arc(exitZone.x + exitZone.width / 2, exitZone.y + exitZone.height / 2, 80, 0, Math.PI * 2);
+            shadowCtx.fill();
+            
+            shadowCtx.globalCompositeOperation = 'source-over';
+            
+            ctx.drawImage(shadowCanvas, 0, 0);
+            
+            if (lightLevel < 25) {
+                const pulse = Math.sin(globalTime * 6) * 0.08 + 0.08;
+                ctx.fillStyle = `rgba(255, 0, 0, ${pulse})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) {
+                keys[key] = true;
+                e.preventDefault();
+            }
+            
+            // Pause with ESC
+            if (e.key === 'Escape' && isPlaying) {
+                e.preventDefault();
+                togglePause();
+            }
+            
+            // Throw egg with spacebar
+            if (e.key === ' ' && isPlaying && !isPaused && hasEgg && !thrownEgg && enemies.length > 0) {
+                e.preventDefault();
+                
+                // Find closest enemy
+                const pCX = player.x + player.width / 2;
+                const pCY = player.y + player.height / 2;
+                let closestEnemy = null;
+                let closestDist = Infinity;
+                
+                for (const e of enemies) {
+                    const dist = Math.hypot(pCX - e.x, pCY - e.y);
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closestEnemy = e;
+                    }
+                }
+                
+                if (closestEnemy) {
+                    hasEgg = false;
+                    thrownEgg = {
+                        x: pCX,
+                        y: pCY,
+                        targetX: closestEnemy.x,
+                        targetY: closestEnemy.y,
+                        progress: 0
+                    };
+                    showMessage("Egg thrown!", 500);
+                }
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) {
+                keys[key] = false;
+            }
+        });
+
+        easyBtn.addEventListener('click', () => {
+            createPatterns();
+            startGame('easy');
+        });
+        
+        mediumBtn.addEventListener('click', () => {
+            createPatterns();
+            startGame('medium');
+        });
+        
+        hardBtn.addEventListener('click', () => {
+            createPatterns();
+            startGame('hard');
+        });
+        
+        levelSelectBtn.addEventListener('click', () => {
+            // Default to medium if no difficulty selected yet
+            if (!currentDifficulty) currentDifficulty = 'medium';
+            showLevelSelect();
+        });
+        
+        backBtn.addEventListener('click', () => {
+            levelSelectScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+        });
+        
+        resumeBtn.addEventListener('click', () => {
+            togglePause();
+        });
+        
+        quitBtn.addEventListener('click', () => {
+            quitToMenu();
+        });
+        
+        retryBtn.addEventListener('click', () => {
+            createPatterns();
+            if (startedFromLevelSelect) {
+                startFromLevel(currentLevel);
+            } else {
+                startGame(currentDifficulty);
+            }
+        });
+        
+        playAgainBtn.addEventListener('click', () => {
+            createPatterns();
+            startGame(currentDifficulty);
+        });
+    </script>
+</body>
+</html>
